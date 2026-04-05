@@ -1,4 +1,4 @@
-const CACHE = 'vquiz-v1';
+const CACHE = 'vquiz-v2';
 const ASSETS = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
