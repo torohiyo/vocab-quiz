@@ -494,6 +494,51 @@
     }
     #toast.show { opacity: 1; }
 
+    /* ── Sheet tabs ── */
+    .sheet-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--clr-outline);
+      margin: 0 -24px 20px;
+      padding: 0 24px;
+    }
+    .sheet-tab {
+      flex: 1; padding: 12px 8px;
+      font-size: 15px; font-weight: 600;
+      text-align: center;
+      border: none; background: none;
+      color: var(--clr-on-surface-dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color .2s, border-color .2s;
+    }
+    .sheet-tab.active { color: var(--clr-primary); border-bottom-color: var(--clr-primary); }
+    .sheet-panel { display: none; }
+    .sheet-panel.active { display: block; }
+
+    /* ── Form fields ── */
+    .form-group { margin-bottom: 14px; }
+    .form-label { font-size: 13px; font-weight: 600; color: var(--clr-on-surface-dim); margin-bottom: 6px; display: block; }
+    .form-input {
+      width: 100%; padding: 14px 16px;
+      border-radius: 14px;
+      border: 1.5px solid var(--clr-outline);
+      background: var(--clr-surface-2);
+      font-size: 16px; color: var(--clr-on-surface);
+      outline: none; -webkit-appearance: none;
+      transition: border-color .2s;
+    }
+    .form-input:focus { border-color: var(--clr-primary); background: var(--clr-surface); }
+    .form-select {
+      width: 100%; padding: 14px 16px;
+      border-radius: 14px;
+      border: 1.5px solid var(--clr-outline);
+      background: var(--clr-surface-2);
+      font-size: 16px; color: var(--clr-on-surface);
+      outline: none; -webkit-appearance: none;
+      cursor: pointer;
+    }
+
     /* ── Pixel Fold wide layout ── */
     @media (min-width: 600px) {
       .bottom-nav { left: 50%; transform: translateX(-50%); }
@@ -588,16 +633,47 @@
 <!-- Toast -->
 <div id="toast"></div>
 
-<!-- ══ MODAL: CSV Upload ══ -->
+<!-- ══ MODAL: Add ══ -->
 <div class="overlay" id="upload-overlay" onclick="maybeCloseOverlay(event,'upload-overlay')">
   <div class="sheet">
     <div class="sheet-handle"></div>
-    <div class="sheet-title">問題集を追加</div>
-    <div class="upload-zone">
-      <input type="file" accept=".csv,text/csv" id="csv-file" onchange="onCSVSelect(event)">
-      <div class="upload-emoji">📄</div>
-      <div class="upload-main">CSVファイルを選択</div>
-      <div class="upload-hint">1行目: word,meaning（ヘッダー自動判定）</div>
+    <div class="sheet-title">追加</div>
+
+    <!-- tabs -->
+    <div class="sheet-tabs">
+      <button class="sheet-tab active" id="tab-csv" onclick="switchSheetTab('csv')">📄 問題集を追加</button>
+      <button class="sheet-tab"        id="tab-word" onclick="switchSheetTab('word')">✏️ 単語を追加</button>
+    </div>
+
+    <!-- panel: CSV -->
+    <div class="sheet-panel active" id="panel-csv">
+      <div class="upload-zone">
+        <input type="file" accept=".csv,text/csv" id="csv-file" onchange="onCSVSelect(event)">
+        <div class="upload-emoji">📄</div>
+        <div class="upload-main">CSVファイルを選択</div>
+        <div class="upload-hint">1行目: word,meaning（ヘッダー自動判定）</div>
+      </div>
+    </div>
+
+    <!-- panel: manual word -->
+    <div class="sheet-panel" id="panel-word">
+      <div class="form-group">
+        <label class="form-label">追加先の問題集</label>
+        <select class="form-select" id="word-set-select" onchange="onSetSelectChange()"></select>
+      </div>
+      <div class="form-group" id="new-set-name-group" style="display:none">
+        <label class="form-label">新しい問題集の名前</label>
+        <input class="form-input" id="new-set-name" type="text" placeholder="例: TOEIC頻出単語">
+      </div>
+      <div class="form-group">
+        <label class="form-label">英単語</label>
+        <input class="form-input" id="word-input" type="text" placeholder="例: apple" autocomplete="off" autocorrect="off" autocapitalize="none">
+      </div>
+      <div class="form-group">
+        <label class="form-label">意味（日本語）</label>
+        <input class="form-input" id="meaning-input" type="text" placeholder="例: りんご" autocomplete="off">
+      </div>
+      <button class="btn btn-primary btn-full btn-lg" onclick="addWordManually()" style="margin-top:4px">追加する</button>
     </div>
   </div>
 </div>
@@ -931,7 +1007,84 @@ function goHome() { switchTab('home'); }
 /* ================================================================
    CSV UPLOAD
 ================================================================ */
-function openUpload() { openOverlay('upload-overlay'); document.getElementById('csv-file').value=''; }
+/* ================================================================
+   SHEET TABS
+================================================================ */
+function switchSheetTab(tab) {
+  document.querySelectorAll('.sheet-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.sheet-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+  if (tab === 'word') populateSetSelect();
+}
+
+function populateSetSelect() {
+  const sel = document.getElementById('word-set-select');
+  const MANUAL_ID = '__manual__';
+  sel.innerHTML = `
+    <option value="${MANUAL_ID}">✏️ 手動追加セット（自動作成）</option>
+    ${sets.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}
+    <option value="__new__">＋ 新しい問題集を作成…</option>
+  `;
+  sel.value = sets.find(s => s.id === MANUAL_ID) ? MANUAL_ID : MANUAL_ID;
+  onSetSelectChange();
+}
+
+function onSetSelectChange() {
+  const val = document.getElementById('word-set-select').value;
+  document.getElementById('new-set-name-group').style.display = val === '__new__' ? 'block' : 'none';
+}
+
+function addWordManually() {
+  const word    = document.getElementById('word-input').value.trim();
+  const meaning = document.getElementById('meaning-input').value.trim();
+  if (!word || !meaning) { toast('⚠️ 英単語と意味を両方入力してください'); return; }
+
+  const selVal = document.getElementById('word-set-select').value;
+  let targetSet;
+
+  if (selVal === '__new__') {
+    const newName = document.getElementById('new-set-name').value.trim();
+    if (!newName) { toast('⚠️ 問題集の名前を入力してください'); return; }
+    targetSet = { id: Date.now().toString(), name: newName, words: [], createdAt: new Date().toISOString() };
+    sets.push(targetSet);
+  } else if (selVal === '__manual__') {
+    targetSet = sets.find(s => s.id === '__manual__');
+    if (!targetSet) {
+      targetSet = { id: '__manual__', name: '手動追加', words: [], createdAt: new Date().toISOString() };
+      sets.push(targetSet);
+    }
+  } else {
+    targetSet = sets.find(s => s.id === selVal);
+  }
+
+  if (!targetSet) return;
+  if (targetSet.words.find(w => w.word.toLowerCase() === word.toLowerCase())) {
+    toast(`⚠️ "${word}" はすでに登録されています`);
+    return;
+  }
+
+  targetSet.words.push({ word, meaning });
+  store(SK.SETS, sets);
+
+  document.getElementById('word-input').value = '';
+  document.getElementById('meaning-input').value = '';
+  document.getElementById('word-input').focus();
+
+  // refresh select in case new set was created
+  populateSetSelect();
+  document.getElementById('word-set-select').value = targetSet.id;
+  onSetSelectChange();
+
+  toast(`✅ "${word}" を「${targetSet.name}」に追加しました`);
+  renderHome();
+}
+
+function openUpload() {
+  openOverlay('upload-overlay');
+  document.getElementById('csv-file').value = '';
+  switchSheetTab('csv');
+}
 
 function onCSVSelect(e) {
   const file = e.target.files[0];
