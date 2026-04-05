@@ -340,34 +340,66 @@
       padding: 3px 10px;
       border-radius: 20px;
     }
-    .answer-field {
-      width: 100%;
-      padding: 16px 18px;
-      border-radius: 16px;
-      border: 2px solid var(--clr-outline);
-      background: var(--clr-surface);
-      font-size: 18px;
-      color: var(--clr-on-surface);
-      outline: none;
-      -webkit-appearance: none;
-      transition: border-color .2s;
-      margin-bottom: 14px;
-    }
-    .answer-field:focus  { border-color: var(--clr-primary); }
-    .answer-field.ok     { border-color: var(--clr-success); background: var(--clr-success-bg); }
-    .answer-field.ng     { border-color: var(--clr-error);   background: var(--clr-error-bg); }
-    .answer-field:disabled { opacity: .8; }
-    .feedback-box {
-      border-radius: 14px;
-      padding: 14px 18px;
-      margin-bottom: 16px;
+    /* reveal card */
+    .meaning-reveal {
+      background: var(--clr-primary-container);
+      border-radius: 20px;
+      padding: 28px 24px;
+      text-align: center;
+      margin-bottom: 20px;
       display: none;
     }
-    .feedback-box.ok { display: block; background: var(--clr-success-bg); color: var(--clr-success); }
-    .feedback-box.ng { display: block; background: var(--clr-error-bg);   color: var(--clr-error); }
-    .fb-label  { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
-    .fb-answer { font-size: 16px; }
-    .quiz-btn-row { display: flex; gap: 10px; }
+    .meaning-reveal.show { display: block; }
+    .meaning-tag {
+      font-size: 12px; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--clr-on-surface-dim);
+      margin-bottom: 10px;
+    }
+    .meaning-text {
+      font-size: 30px; font-weight: 700;
+      color: var(--clr-on-surface);
+      word-break: break-word;
+    }
+    /* reveal button */
+    .btn-reveal {
+      width: 100%; min-height: 56px;
+      background: var(--clr-surface);
+      color: var(--clr-primary);
+      border: 2px solid var(--clr-primary);
+      border-radius: 18px;
+      font-size: 18px; font-weight: 600;
+      cursor: pointer; margin-bottom: 16px;
+      transition: background .15s;
+    }
+    .btn-reveal:active { background: var(--clr-primary-container); }
+    .btn-reveal:disabled { display: none; }
+    /* judge buttons */
+    .judge-row {
+      display: none; gap: 12px;
+    }
+    .judge-row.show { display: flex; }
+    .btn-known {
+      flex: 1; min-height: 60px;
+      background: var(--clr-success-bg);
+      color: var(--clr-success);
+      border: 2px solid var(--clr-success);
+      border-radius: 18px;
+      font-size: 17px; font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn-known:active { opacity: .75; }
+    .btn-unknown {
+      flex: 1; min-height: 60px;
+      background: var(--clr-error-bg);
+      color: var(--clr-error);
+      border: 2px solid var(--clr-error);
+      border-radius: 18px;
+      font-size: 17px; font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn-unknown:active { opacity: .75; }
 
     /* ── Results screen ── */
     .results-wrap { padding: 24px 20px 120px; display: flex; flex-direction: column; gap: 24px; }
@@ -500,19 +532,18 @@
           <div id="qz-miss-badge"></div>
         </div>
 
-        <input class="answer-field" id="qz-input"
-               type="text" placeholder="日本語の意味を入力…"
-               autocomplete="off" autocorrect="off" autocapitalize="off"
-               inputmode="text">
-
-        <div class="feedback-box" id="qz-feedback">
-          <div class="fb-label" id="fb-label"></div>
-          <div class="fb-answer" id="fb-answer"></div>
+        <div class="meaning-reveal" id="qz-meaning">
+          <div class="meaning-tag">意味</div>
+          <div class="meaning-text" id="qz-meaning-text"></div>
         </div>
 
-        <div class="quiz-btn-row">
-          <button class="btn btn-outline" id="btn-skip" onclick="skipQuestion()">スキップ</button>
-          <button class="btn btn-primary btn-lg" id="btn-submit" onclick="submitOrNext()" style="flex:2">答える</button>
+        <button class="btn-reveal" id="btn-reveal" onclick="revealAnswer()">
+          答えを見る 👀
+        </button>
+
+        <div class="judge-row" id="judge-row">
+          <button class="btn-unknown" onclick="judge(false)">わからない 😔</button>
+          <button class="btn-known"   onclick="judge(true)">わかった！ 😊</button>
         </div>
       </div>
     </div>
@@ -682,45 +713,23 @@ function renderQ() {
   const badge = document.getElementById('qz-miss-badge');
   badge.innerHTML = mc > 0 ? `<span class="word-miss-badge">⚠️ 過去 ${mc} 回ミス</span>` : '';
 
-  const input = document.getElementById('qz-input');
-  input.value = ''; input.className = 'answer-field'; input.disabled = false;
-  input.focus();
-
-  document.getElementById('qz-feedback').className = 'feedback-box';
-  document.getElementById('btn-submit').textContent = '答える';
-  document.getElementById('btn-skip').style.display = '';
-
-  quiz.submitted = false;
+  // reset reveal state
+  document.getElementById('qz-meaning').classList.remove('show');
+  document.getElementById('btn-reveal').disabled = false;
+  document.getElementById('judge-row').classList.remove('show');
 }
 
-function submitOrNext() {
-  if (quiz.submitted) { advance(); return; }
-  const input = document.getElementById('qz-input');
-  const answer = input.value.trim();
-  if (!answer) { input.focus(); return; }
-  evaluate(answer);
-}
-
-function skipQuestion() {
-  if (quiz.submitted) return;
+function revealAnswer() {
   const q = quiz.questions[quiz.index];
-  evaluate('');
+  document.getElementById('qz-meaning-text').textContent = q.meaning;
+  document.getElementById('qz-meaning').classList.add('show');
+  document.getElementById('btn-reveal').disabled = true;
+  document.getElementById('judge-row').classList.add('show');
 }
 
-function evaluate(answer) {
-  const q  = quiz.questions[quiz.index];
-  const ok = answer !== '' && norm(answer) === norm(q.meaning);
-
-  const input = document.getElementById('qz-input');
-  input.disabled = true;
-  input.className = 'answer-field ' + (ok ? 'ok' : 'ng');
-
-  const fb = document.getElementById('qz-feedback');
-  document.getElementById('fb-label').textContent  = ok ? '✅ 正解！' : (answer ? '❌ 不正解' : '⏭ スキップ');
-  document.getElementById('fb-answer').textContent = ok ? `正解: ${q.meaning}` : `正解: ${q.meaning}`;
-  fb.className = 'feedback-box ' + (ok ? 'ok' : 'ng');
-
-  if (ok) {
+function judge(known) {
+  const q = quiz.questions[quiz.index];
+  if (known) {
     quiz.correct++;
   } else {
     quiz.wrongThisRound.push(q);
@@ -728,28 +737,17 @@ function evaluate(answer) {
     wrong[quiz.setId][q.word] = (wrong[quiz.setId][q.word]||0) + 1;
     store(SK.WRONG, wrong);
   }
-
-  const isLast = quiz.index === quiz.questions.length - 1;
-  document.getElementById('btn-submit').textContent = isLast ? '結果を見る →' : '次へ →';
-  document.getElementById('btn-skip').style.display = 'none';
-  quiz.submitted = true;
+  // brief flash then advance
+  document.getElementById('judge-row').classList.remove('show');
+  setTimeout(() => {
+    if (quiz.index < quiz.questions.length - 1) {
+      quiz.index++;
+      renderQ();
+    } else {
+      showResults();
+    }
+  }, 150);
 }
-
-function advance() {
-  if (quiz.index < quiz.questions.length - 1) {
-    quiz.index++;
-    renderQ();
-  } else {
-    showResults();
-  }
-}
-
-/* keyboard shortcut */
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && document.getElementById('pg-quiz').classList.contains('active')) {
-    submitOrNext();
-  }
-});
 
 /* ================================================================
    RESULTS
