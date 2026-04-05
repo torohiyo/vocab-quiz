@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1565C0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>単語クイズ</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* ── Design tokens (Material Design 3 inspired) ── */
+    :root {
+      --clr-primary:          #1565C0;
+      --clr-primary-dim:      #1976D2;
+      --clr-primary-container:#DBEAFE;
+      --clr-on-primary:       #FFFFFF;
+      --clr-success:          #2E7D32;
+      --clr-success-bg:       #E8F5E9;
+      --clr-error:            #C62828;
+      --clr-error-bg:         #FFEBEE;
+      --clr-surface:          #FFFFFF;
+      --clr-surface-2:        #F4F6FB;
+      --clr-surface-3:        #E8ECF4;
+      --clr-on-surface:       #1A1C2A;
+      --clr-on-surface-dim:   #5A5E72;
+      --clr-bg:               #EEF2FF;
+      --clr-outline:          #BCC0CC;
+      --nav-h:                68px;
+      --safe-b:               env(safe-area-inset-bottom, 0px);
+      --safe-t:               env(safe-area-inset-top, 0px);
+      --radius-card:          20px;
+      --radius-btn:           14px;
+      --shadow-card:          0 2px 8px rgba(21,101,192,.10);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --clr-primary:          #90CAF9;
+        --clr-primary-dim:      #64B5F6;
+        --clr-primary-container:#0D3B6E;
+        --clr-on-primary:       #001D36;
+        --clr-success:          #81C784;
+        --clr-success-bg:       #1B3A1C;
+        --clr-error:            #EF9A9A;
+        --clr-error-bg:         #3B1818;
+        --clr-surface:          #1C1F2A;
+        --clr-surface-2:        #252837;
+        --clr-surface-3:        #2E3244;
+        --clr-on-surface:       #E2E4F0;
+        --clr-on-surface-dim:   #9295A8;
+        --clr-bg:               #12141E;
+        --clr-outline:          #3E4155;
+        --shadow-card:          0 2px 8px rgba(0,0,0,.35);
+      }
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: 'Roboto', 'Noto Sans JP', system-ui, sans-serif;
+      background: var(--clr-bg);
+      color: var(--clr-on-surface);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── App shell ── */
+    #app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      max-width: 600px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* ── Top App Bar ── */
+    .app-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 8px;
+      padding-top: var(--safe-t);
+      height: calc(56px + var(--safe-t));
+      background: var(--clr-surface);
+      border-bottom: 1px solid var(--clr-outline);
+      flex-shrink: 0;
+      z-index: 20;
+    }
+    .app-bar-title {
+      font-size: 20px;
+      font-weight: 500;
+      flex: 1;
+      padding: 0 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .icon-btn {
+      width: 48px; height: 48px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+      border: none; background: none;
+      color: var(--clr-on-surface);
+      font-size: 22px;
+      cursor: pointer;
+      transition: background .15s;
+      flex-shrink: 0;
+    }
+    .icon-btn:active { background: var(--clr-surface-3); }
+
+    /* ── Scrollable content ── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    /* ── Bottom navigation (Android style) ── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      max-width: 600px;
+      margin: 0 auto;
+      height: calc(var(--nav-h) + var(--safe-b));
+      padding-bottom: var(--safe-b);
+      background: var(--clr-surface);
+      border-top: 1px solid var(--clr-outline);
+      display: flex;
+      z-index: 100;
+    }
+    .nav-item {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 4px;
+      border: none; background: none;
+      color: var(--clr-on-surface-dim);
+      cursor: pointer;
+      transition: color .2s;
+      padding: 8px 4px;
+      min-height: 48px;
+    }
+    .nav-item.active { color: var(--clr-primary); }
+    .nav-icon { font-size: 24px; line-height: 1; }
+    .nav-label { font-size: 12px; font-weight: 500; }
+
+    /* ── Page visibility ── */
+    .page { display: none; flex-direction: column; height: 100%; }
+    .page.active { display: flex; }
+
+    /* ── FAB ── */
+    .fab {
+      position: fixed;
+      bottom: calc(var(--nav-h) + var(--safe-b) + 16px);
+      right: max(16px, calc(50vw - 300px + 16px));
+      width: 56px; height: 56px;
+      background: var(--clr-primary);
+      color: var(--clr-on-primary);
+      border: none; border-radius: 16px;
+      font-size: 28px; font-weight: 300;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 12px rgba(21,101,192,.4);
+      z-index: 50;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .fab:active { transform: scale(.94); box-shadow: 0 2px 6px rgba(21,101,192,.4); }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--clr-surface);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+    }
+
+    /* ── Set card ── */
+    .set-card {
+      background: var(--clr-surface);
+      border-radius: var(--radius-card);
+      margin: 8px 16px;
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+    .set-card-body {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 16px 16px 12px;
+    }
+    .set-icon {
+      width: 48px; height: 48px;
+      background: var(--clr-primary-container);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; flex-shrink: 0;
+    }
+    .set-info { flex: 1; min-width: 0; }
+    .set-name {
+      font-size: 16px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 5px;
+    }
+    .set-meta { display: flex; gap: 12px; font-size: 13px; color: var(--clr-on-surface-dim); }
+    .meta-err { color: var(--clr-error); }
+    .meta-ok  { color: var(--clr-success); }
+    .set-actions {
+      display: flex; gap: 8px;
+      padding: 0 12px 12px;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 48px;
+      padding: 10px 16px;
+      border-radius: var(--radius-btn);
+      border: none; cursor: pointer;
+      font-size: 15px; font-weight: 500;
+      transition: opacity .15s, background .15s;
+      flex: 1;
+    }
+    .btn:active { opacity: .8; }
+    .btn-primary   { background: var(--clr-primary); color: var(--clr-on-primary); }
+    .btn-outline   { background: transparent; color: var(--clr-primary); border: 1.5px solid var(--clr-primary); }
+    .btn-outline:active { background: var(--clr-primary-container); opacity: 1; }
+    .btn-ghost     { background: transparent; color: var(--clr-primary); }
+    .btn-danger    { background: transparent; color: var(--clr-error); border: 1.5px solid var(--clr-error); }
+    .btn-danger:active { background: var(--clr-error-bg); opacity: 1; }
+    .btn-delete    { flex: 0; padding: 10px 14px; min-width: 48px; }
+    .btn-full      { width: 100%; }
+    .btn-lg        { min-height: 54px; font-size: 17px; border-radius: 16px; }
+
+    /* ── Empty state ── */
+    .empty {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 64px 24px; gap: 14px; text-align: center;
+    }
+    .empty-icon  { font-size: 72px; opacity: .35; }
+    .empty-title { font-size: 20px; font-weight: 500; }
+    .empty-desc  { font-size: 14px; color: var(--clr-on-surface-dim); line-height: 1.7; }
+
+    /* ── Section label ── */
+    .section-label {
+      padding: 20px 16px 6px;
+      font-size: 12px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .08em;
+      color: var(--clr-on-surface-dim);
+    }
+
+    /* ── Bottom sheet / modal ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5);
+      z-index: 200;
+      display: flex; align-items: flex-end;
+      opacity: 0; pointer-events: none;
+      transition: opacity .25s;
+    }
+    .overlay.open { opacity: 1; pointer-events: auto; }
+    .sheet {
+      background: var(--clr-surface);
+      border-radius: 28px 28px 0 0;
+      width: 100%; max-width: 600px;
+      margin: 0 auto;
+      padding: 0 24px calc(32px + var(--safe-b));
+      transform: translateY(100%);
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+    }
+    .overlay.open .sheet { transform: translateY(0); }
+    .sheet-handle {
+      width: 36px; height: 4px;
+      background: var(--clr-outline);
+      border-radius: 2px;
+      margin: 14px auto 22px;
+    }
+    .sheet-title { font-size: 20px; font-weight: 600; margin-bottom: 20px; }
+
+    /* ── CSV upload zone ── */
+    .upload-zone {
+      border: 2px dashed var(--clr-primary);
+      border-radius: 16px;
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: background .2s;
+    }
+    .upload-zone:active { background: var(--clr-primary-container); }
+    .upload-zone input {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer;
+      width: 100%; height: 100%;
+    }
+    .upload-emoji { font-size: 52px; margin-bottom: 10px; }
+    .upload-main  { font-size: 16px; font-weight: 500; color: var(--clr-primary); }
+    .upload-hint  { font-size: 13px; color: var(--clr-on-surface-dim); margin-top: 6px; }
+
+    /* ── Quiz screen ── */
+    .quiz-wrap { padding: 20px 20px 120px; }
+    .progress-bar {
+      height: 4px; background: var(--clr-surface-3);
+      border-radius: 2px; overflow: hidden; margin-bottom: 10px;
+    }
+    .progress-fill {
+      height: 100%; background: var(--clr-primary);
+      border-radius: 2px; transition: width .4s ease;
+    }
+    .quiz-meta {
+      display: flex; justify-content: space-between;
+      font-size: 13px; color: var(--clr-on-surface-dim);
+      margin-bottom: 28px;
+    }
+    .word-card {
+      background: var(--clr-surface);
+      border-radius: 24px;
+      padding: 44px 24px 36px;
+      text-align: center;
+      box-shadow: var(--shadow-card);
+      margin-bottom: 28px;
+    }
+    .word-tag {
+      font-size: 12px; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--clr-on-surface-dim);
+      margin-bottom: 14px;
+    }
+    .word-text {
+      font-size: 42px; font-weight: 700;
+      color: var(--clr-on-surface);
+      letter-spacing: .02em;
+      word-break: break-word;
+    }
+    .word-miss-badge {
+      margin-top: 10px;
+      display: inline-block;
+      font-size: 12px;
+      color: var(--clr-error);
+      background: var(--clr-error-bg);
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    .answer-field {
+      width: 100%;
+      padding: 16px 18px;
+      border-radius: 16px;
+      border: 2px solid var(--clr-outline);
+      background: var(--clr-surface);
+      font-size: 18px;
+      color: var(--clr-on-surface);
+      outline: none;
+      -webkit-appearance: none;
+      transition: border-color .2s;
+      margin-bottom: 14px;
+    }
+    .answer-field:focus  { border-color: var(--clr-primary); }
+    .answer-field.ok     { border-color: var(--clr-success); background: var(--clr-success-bg); }
+    .answer-field.ng     { border-color: var(--clr-error);   background: var(--clr-error-bg); }
+    .answer-field:disabled { opacity: .8; }
+    .feedback-box {
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .feedback-box.ok { display: block; background: var(--clr-success-bg); color: var(--clr-success); }
+    .feedback-box.ng { display: block; background: var(--clr-error-bg);   color: var(--clr-error); }
+    .fb-label  { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .fb-answer { font-size: 16px; }
+    .quiz-btn-row { display: flex; gap: 10px; }
+
+    /* ── Results screen ── */
+    .results-wrap { padding: 24px 20px 120px; display: flex; flex-direction: column; gap: 24px; }
+    .score-ring-wrap {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 4px;
+    }
+    .score-ring {
+      width: 160px; height: 160px;
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .score-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+    .ring-bg   { fill: none; stroke: var(--clr-surface-3); stroke-width: 10; }
+    .ring-fill { fill: none; stroke: var(--clr-primary); stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+    .score-inner { text-align: center; }
+    .score-pct   { font-size: 38px; font-weight: 700; color: var(--clr-primary); }
+    .score-sub   { font-size: 13px; color: var(--clr-on-surface-dim); }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .stat-box {
+      background: var(--clr-surface);
+      border-radius: 18px;
+      padding: 18px 16px;
+      text-align: center;
+      box-shadow: var(--shadow-card);
+    }
+    .stat-val   { font-size: 30px; font-weight: 700; }
+    .stat-label { font-size: 13px; color: var(--clr-on-surface-dim); margin-top: 4px; }
+    .stat-box.ok-box .stat-val  { color: var(--clr-success); }
+    .stat-box.err-box .stat-val { color: var(--clr-error); }
+    .result-actions { display: flex; flex-direction: column; gap: 10px; }
+
+    /* ── Wrong words list ── */
+    .wrong-section-title {
+      font-size: 15px; font-weight: 600;
+      color: var(--clr-error);
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 10px;
+    }
+    .wrong-row {
+      background: var(--clr-surface);
+      border-radius: 14px;
+      padding: 13px 16px;
+      margin-bottom: 8px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: var(--shadow-card);
+    }
+    .wrong-word    { font-size: 16px; font-weight: 600; }
+    .wrong-meaning { font-size: 13px; color: var(--clr-on-surface-dim); margin-top: 2px; }
+    .wrong-badge {
+      font-size: 13px; font-weight: 600;
+      color: var(--clr-error);
+      background: var(--clr-error-bg);
+      padding: 4px 10px; border-radius: 20px;
+      flex-shrink: 0;
+    }
+
+    /* ── Stats page ── */
+    .stats-set-card {
+      background: var(--clr-surface);
+      border-radius: var(--radius-card);
+      margin: 8px 16px;
+      padding: 16px;
+      box-shadow: var(--shadow-card);
+    }
+    .stats-set-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 12px;
+    }
+    .stats-set-name { font-size: 16px; font-weight: 600; }
+    .stats-nums { display: flex; gap: 20px; margin-bottom: 14px; }
+    .stat-num-item .num { font-size: 26px; font-weight: 700; }
+    .stat-num-item .lbl { font-size: 12px; color: var(--clr-on-surface-dim); }
+    .stat-num-item.err .num { color: var(--clr-error); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: calc(var(--nav-h) + var(--safe-b) + 12px);
+      left: 16px; right: 16px;
+      max-width: 568px; margin: 0 auto;
+      background: #2A2D3A;
+      color: #fff;
+      padding: 14px 20px;
+      border-radius: 14px;
+      font-size: 14px;
+      text-align: center;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .3s;
+    }
+    #toast.show { opacity: 1; }
+
+    /* ── Pixel Fold wide layout ── */
+    @media (min-width: 600px) {
+      .bottom-nav { left: 50%; transform: translateX(-50%); }
+      .fab        { right: calc(50vw - 300px + 16px); }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ PAGE: HOME ══ -->
+  <div id="pg-home" class="page active">
+    <div class="app-bar">
+      <div class="app-bar-title">📚 単語クイズ</div>
+    </div>
+    <div class="content" id="home-content" style="padding-bottom: calc(var(--nav-h) + var(--safe-b) + 72px);"></div>
+  </div>
+
+  <!-- ══ PAGE: QUIZ ══ -->
+  <div id="pg-quiz" class="page">
+    <div class="app-bar">
+      <button class="icon-btn" onclick="goHome()" aria-label="戻る">←</button>
+      <div class="app-bar-title" id="quiz-bar-title">クイズ</div>
+    </div>
+    <div class="content">
+      <div class="quiz-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="qz-prog"></div></div>
+        <div class="quiz-meta">
+          <span id="qz-mode-badge"></span>
+          <span id="qz-counter"></span>
+        </div>
+
+        <div class="word-card">
+          <div class="word-tag">英単語</div>
+          <div class="word-text" id="qz-word"></div>
+          <div id="qz-miss-badge"></div>
+        </div>
+
+        <input class="answer-field" id="qz-input"
+               type="text" placeholder="日本語の意味を入力…"
+               autocomplete="off" autocorrect="off" autocapitalize="off"
+               inputmode="text">
+
+        <div class="feedback-box" id="qz-feedback">
+          <div class="fb-label" id="fb-label"></div>
+          <div class="fb-answer" id="fb-answer"></div>
+        </div>
+
+        <div class="quiz-btn-row">
+          <button class="btn btn-outline" id="btn-skip" onclick="skipQuestion()">スキップ</button>
+          <button class="btn btn-primary btn-lg" id="btn-submit" onclick="submitOrNext()" style="flex:2">答える</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PAGE: RESULTS ══ -->
+  <div id="pg-results" class="page">
+    <div class="app-bar">
+      <button class="icon-btn" onclick="goHome()" aria-label="ホームへ">←</button>
+      <div class="app-bar-title">結果</div>
+    </div>
+    <div class="content">
+      <div class="results-wrap" id="results-content"></div>
+    </div>
+  </div>
+
+  <!-- ══ PAGE: STATS ══ -->
+  <div id="pg-stats" class="page">
+    <div class="app-bar">
+      <div class="app-bar-title">📊 統計</div>
+    </div>
+    <div class="content" id="stats-content" style="padding-bottom: calc(var(--nav-h) + var(--safe-b) + 16px);"></div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- Bottom navigation -->
+<nav class="bottom-nav">
+  <button class="nav-item active" id="nav-home" onclick="switchTab('home')">
+    <span class="nav-icon">🏠</span>
+    <span class="nav-label">ホーム</span>
+  </button>
+  <button class="nav-item" id="nav-stats" onclick="switchTab('stats')">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">統計</span>
+  </button>
+</nav>
+
+<!-- FAB -->
+<button class="fab" id="fab" onclick="openUpload()" aria-label="問題集を追加">＋</button>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ══ MODAL: CSV Upload ══ -->
+<div class="overlay" id="upload-overlay" onclick="maybeCloseOverlay(event,'upload-overlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">問題集を追加</div>
+    <div class="upload-zone">
+      <input type="file" accept=".csv,text/csv" id="csv-file" onchange="onCSVSelect(event)">
+      <div class="upload-emoji">📄</div>
+      <div class="upload-main">CSVファイルを選択</div>
+      <div class="upload-hint">1行目: word,meaning（ヘッダー自動判定）</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Delete Confirm ══ -->
+<div class="overlay" id="del-overlay" onclick="maybeCloseOverlay(event,'del-overlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">問題集を削除</div>
+    <p style="color:var(--clr-on-surface-dim);font-size:15px;margin-bottom:24px;line-height:1.6">
+      この問題集と<strong style="color:var(--clr-on-surface)">すべての誤答履歴</strong>を削除します。<br>この操作は元に戻せません。
+    </p>
+    <div style="display:flex;gap:12px">
+      <button class="btn btn-outline" onclick="closeOverlay('del-overlay')">キャンセル</button>
+      <button class="btn btn-danger"  onclick="doDelete()">削除する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   STORAGE
+================================================================ */
+const SK = { SETS: 'vq_sets', WRONG: 'vq_wrong', PREFS: 'vq_prefs' };
+const load  = k => { try { return JSON.parse(localStorage.getItem(k)) } catch(e){ return null } };
+const store = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+
+/* ================================================================
+   STATE
+================================================================ */
+let sets   = load(SK.SETS)  || [];
+let wrong  = load(SK.WRONG) || {};   // { setId: { word: count } }
+let prefs  = load(SK.PREFS) || { shuffle: true };
+let pendingDeleteId = null;
+let quiz   = null;  // active quiz state
+
+/* ================================================================
+   CSV PARSER
+================================================================ */
+function parseCSV(text) {
+  const rows = text.trim().split(/\r?\n/);
+  const isHeader = rows[0].trim().toLowerCase().replace(/[^a-z,]/g,'').startsWith('word');
+  const words = [];
+  for (let i = isHeader ? 1 : 0; i < rows.length; i++) {
+    const row = rows[i].trim();
+    if (!row) continue;
+    const ci = row.indexOf(',');
+    if (ci < 1) continue;
+    const w = row.slice(0, ci).trim().replace(/^["'`]|["'`]$/g,'');
+    const m = row.slice(ci+1).trim().replace(/^["'`]|["'`]$/g,'');
+    if (w && m) words.push({ word: w, meaning: m });
+  }
+  return words;
+}
+
+/* ================================================================
+   QUIZ HELPERS
+================================================================ */
+function shuffle(a) {
+  const b = [...a];
+  for (let i = b.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [b[i],b[j]] = [b[j],b[i]];
+  }
+  return b;
+}
+
+function wc(setId, word) { return (wrong[setId]||{})[word] || 0; }
+function totalWrong(setId) { return Object.values(wrong[setId]||{}).reduce((s,v)=>s+v,0); }
+function wrongWords(setId) {
+  return Object.entries(wrong[setId]||{}).filter(([,v])=>v>0).map(([w])=>w);
+}
+
+function norm(s) { return s.trim().toLowerCase().replace(/\s+/g,' '); }
+
+/* ================================================================
+   QUIZ FLOW
+================================================================ */
+function startQuiz(setId, reviewMode = false) {
+  const set = sets.find(s => s.id === setId);
+  if (!set) return;
+
+  let qs = reviewMode
+    ? set.words.filter(w => wc(setId, w.word) > 0)
+    : [...set.words];
+
+  if (!qs.length) { toast('✅ 復習する問題はありません！'); return; }
+  if (prefs.shuffle) qs = shuffle(qs);
+
+  quiz = {
+    setId, setName: set.name, reviewMode,
+    questions: qs, index: 0,
+    correct: 0, wrongThisRound: [],
+    submitted: false
+  };
+
+  showPage('quiz');
+  renderQ();
+}
+
+function renderQ() {
+  const { questions, index, setId, setName, reviewMode } = quiz;
+  const q = questions[index];
+  const total = questions.length;
+
+  document.getElementById('quiz-bar-title').textContent = reviewMode ? '🔁 復習' : setName;
+  document.getElementById('qz-prog').style.width = (index / total * 100) + '%';
+  document.getElementById('qz-counter').textContent = `${index+1} / ${total}`;
+  document.getElementById('qz-mode-badge').textContent = reviewMode ? '🔁 復習モード' : '📝 通常モード';
+  document.getElementById('qz-word').textContent = q.word;
+
+  const mc = wc(setId, q.word);
+  const badge = document.getElementById('qz-miss-badge');
+  badge.innerHTML = mc > 0 ? `<span class="word-miss-badge">⚠️ 過去 ${mc} 回ミス</span>` : '';
+
+  const input = document.getElementById('qz-input');
+  input.value = ''; input.className = 'answer-field'; input.disabled = false;
+  input.focus();
+
+  document.getElementById('qz-feedback').className = 'feedback-box';
+  document.getElementById('btn-submit').textContent = '答える';
+  document.getElementById('btn-skip').style.display = '';
+
+  quiz.submitted = false;
+}
+
+function submitOrNext() {
+  if (quiz.submitted) { advance(); return; }
+  const input = document.getElementById('qz-input');
+  const answer = input.value.trim();
+  if (!answer) { input.focus(); return; }
+  evaluate(answer);
+}
+
+function skipQuestion() {
+  if (quiz.submitted) return;
+  const q = quiz.questions[quiz.index];
+  evaluate('');
+}
+
+function evaluate(answer) {
+  const q  = quiz.questions[quiz.index];
+  const ok = answer !== '' && norm(answer) === norm(q.meaning);
+
+  const input = document.getElementById('qz-input');
+  input.disabled = true;
+  input.className = 'answer-field ' + (ok ? 'ok' : 'ng');
+
+  const fb = document.getElementById('qz-feedback');
+  document.getElementById('fb-label').textContent  = ok ? '✅ 正解！' : (answer ? '❌ 不正解' : '⏭ スキップ');
+  document.getElementById('fb-answer').textContent = ok ? `正解: ${q.meaning}` : `正解: ${q.meaning}`;
+  fb.className = 'feedback-box ' + (ok ? 'ok' : 'ng');
+
+  if (ok) {
+    quiz.correct++;
+  } else {
+    quiz.wrongThisRound.push(q);
+    if (!wrong[quiz.setId]) wrong[quiz.setId] = {};
+    wrong[quiz.setId][q.word] = (wrong[quiz.setId][q.word]||0) + 1;
+    store(SK.WRONG, wrong);
+  }
+
+  const isLast = quiz.index === quiz.questions.length - 1;
+  document.getElementById('btn-submit').textContent = isLast ? '結果を見る →' : '次へ →';
+  document.getElementById('btn-skip').style.display = 'none';
+  quiz.submitted = true;
+}
+
+function advance() {
+  if (quiz.index < quiz.questions.length - 1) {
+    quiz.index++;
+    renderQ();
+  } else {
+    showResults();
+  }
+}
+
+/* keyboard shortcut */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('pg-quiz').classList.contains('active')) {
+    submitOrNext();
+  }
+});
+
+/* ================================================================
+   RESULTS
+================================================================ */
+function showResults() {
+  showPage('results');
+  const { questions, correct, wrongThisRound, setId } = quiz;
+  const total = questions.length;
+  const pct   = Math.round(correct / total * 100);
+  const circ  = 2 * Math.PI * 60;
+  const off   = circ - (pct / 100) * circ;
+
+  const reviewWords = wrongWords(setId);
+
+  document.getElementById('results-content').innerHTML = `
+    <div class="score-ring-wrap">
+      <div class="score-ring">
+        <svg viewBox="0 0 136 136">
+          <circle class="ring-bg" cx="68" cy="68" r="60"/>
+          <circle class="ring-fill" cx="68" cy="68" r="60"
+            stroke-dasharray="${circ.toFixed(1)}"
+            stroke-dashoffset="${off.toFixed(1)}"/>
+        </svg>
+        <div class="score-inner">
+          <div class="score-pct">${pct}%</div>
+          <div class="score-sub">正答率</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-box ok-box"><div class="stat-val">${correct}</div><div class="stat-label">正解</div></div>
+      <div class="stat-box err-box"><div class="stat-val">${total-correct}</div><div class="stat-label">不正解</div></div>
+      <div class="stat-box"><div class="stat-val">${total}</div><div class="stat-label">出題数</div></div>
+      <div class="stat-box ${reviewWords.length>0?'err-box':'ok-box'}">
+        <div class="stat-val">${reviewWords.length}</div>
+        <div class="stat-label">要復習語数</div>
+      </div>
+    </div>
+
+    ${wrongThisRound.length > 0 ? `
+      <div>
+        <div class="wrong-section-title">❌ 今回の誤答 (${wrongThisRound.length}語)</div>
+        ${wrongThisRound.map(w => `
+          <div class="wrong-row">
+            <div>
+              <div class="wrong-word">${esc(w.word)}</div>
+              <div class="wrong-meaning">${esc(w.meaning)}</div>
+            </div>
+            <div class="wrong-badge">${wc(quiz.setId, w.word)}回</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    <div class="result-actions">
+      ${wrongThisRound.length > 0 ? `
+        <button class="btn btn-outline btn-lg btn-full" onclick="startQuiz('${quiz.setId}',true)">
+          🔁 間違えた問題を復習
+        </button>
+      ` : ''}
+      <button class="btn btn-primary btn-lg btn-full" onclick="startQuiz('${quiz.setId}',false)">
+        🔄 もう一度
+      </button>
+      <button class="btn btn-ghost btn-full" onclick="goHome()">ホームに戻る</button>
+    </div>
+  `;
+}
+
+/* ================================================================
+   RENDER HOME
+================================================================ */
+function renderHome() {
+  const el = document.getElementById('home-content');
+  if (!sets.length) {
+    el.innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">📚</div>
+        <div class="empty-title">問題集がありません</div>
+        <div class="empty-desc">右下の <strong>＋</strong> ボタンから<br>CSVファイルを読み込んで<br>問題集を追加してください</div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="section-label">問題集 (${sets.length})</div>
+    ${sets.map(s => {
+      const ww = wrongWords(s.id);
+      return `
+        <div class="set-card">
+          <div class="set-card-body">
+            <div class="set-icon">📖</div>
+            <div class="set-info">
+              <div class="set-name">${esc(s.name)}</div>
+              <div class="set-meta">
+                <span>📝 ${s.words.length}問</span>
+                ${ww.length > 0
+                  ? `<span class="meta-err">❌ ${ww.length}語 要復習</span>`
+                  : `<span class="meta-ok">✅ 完璧</span>`}
+              </div>
+            </div>
+          </div>
+          <div class="set-actions">
+            <button class="btn btn-primary" onclick="startQuiz('${s.id}',false)">▶ 開始</button>
+            ${ww.length > 0 ? `<button class="btn btn-outline" onclick="startQuiz('${s.id}',true)">🔁 復習</button>` : ''}
+            <button class="btn btn-danger btn-delete" onclick="askDelete('${s.id}')" aria-label="削除">🗑</button>
+          </div>
+        </div>`;
+    }).join('')}
+  `;
+}
+
+/* ================================================================
+   RENDER STATS
+================================================================ */
+function renderStats() {
+  const el = document.getElementById('stats-content');
+  if (!sets.length) {
+    el.innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">📊</div>
+        <div class="empty-title">データなし</div>
+        <div class="empty-desc">問題集を追加してクイズに挑戦すると<br>統計がここに表示されます</div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="section-label">セット別統計</div>
+    ${sets.map(s => {
+      const ww    = wrongWords(s.id);
+      const wdata = wrong[s.id] || {};
+      const top   = ww.sort((a,b) => wdata[b]-wdata[a]).slice(0, 5);
+      return `
+        <div class="stats-set-card">
+          <div class="stats-set-header">
+            <span style="font-size:22px">📖</span>
+            <span class="stats-set-name">${esc(s.name)}</span>
+          </div>
+          <div class="stats-nums">
+            <div class="stat-num-item"><div class="num">${s.words.length}</div><div class="lbl">総問題数</div></div>
+            <div class="stat-num-item err"><div class="num">${ww.length}</div><div class="lbl">要復習</div></div>
+          </div>
+          ${top.length ? `
+            <div style="font-size:13px;font-weight:600;color:var(--clr-error);margin-bottom:8px">よく間違える Top${top.length}</div>
+            ${top.map(w => {
+              const meaning = s.words.find(x=>x.word===w)?.meaning || '';
+              return `
+                <div class="wrong-row">
+                  <div><div class="wrong-word">${esc(w)}</div><div class="wrong-meaning">${esc(meaning)}</div></div>
+                  <div class="wrong-badge">${wdata[w]}回</div>
+                </div>`;
+            }).join('')}
+          ` : `<div style="color:var(--clr-success);font-size:14px">✅ 誤答履歴なし</div>`}
+        </div>`;
+    }).join('')}
+  `;
+}
+
+/* ================================================================
+   NAVIGATION
+================================================================ */
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('pg-'+name).classList.add('active');
+  const isMain = name === 'home' || name === 'stats';
+  document.querySelector('.bottom-nav').style.display = isMain ? 'flex' : 'none';
+  document.getElementById('fab').style.display = name === 'home' ? 'flex' : 'none';
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('nav-'+tab).classList.add('active');
+  showPage(tab);
+  if (tab === 'home')  renderHome();
+  if (tab === 'stats') renderStats();
+}
+
+function goHome() { switchTab('home'); }
+
+/* ================================================================
+   CSV UPLOAD
+================================================================ */
+function openUpload() { openOverlay('upload-overlay'); document.getElementById('csv-file').value=''; }
+
+function onCSVSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const words = parseCSV(ev.target.result);
+    if (!words.length) { toast('⚠️ 有効な単語が見つかりませんでした'); return; }
+    const name = file.name.replace(/\.csv$/i,'');
+    // deduplicate by name
+    if (sets.find(s => s.name === name)) {
+      if (!confirm(`"${name}" はすでに存在します。上書きしますか？`)) return;
+      sets = sets.filter(s => s.name !== name);
+    }
+    sets.push({ id: Date.now().toString(), name, words, createdAt: new Date().toISOString() });
+    store(SK.SETS, sets);
+    closeOverlay('upload-overlay');
+    renderHome();
+    toast(`✅ "${name}" を追加（${words.length}語）`);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+/* ================================================================
+   DELETE
+================================================================ */
+function askDelete(id) { pendingDeleteId = id; openOverlay('del-overlay'); }
+
+function doDelete() {
+  if (!pendingDeleteId) return;
+  sets = sets.filter(s => s.id !== pendingDeleteId);
+  delete wrong[pendingDeleteId];
+  store(SK.SETS, sets);
+  store(SK.WRONG, wrong);
+  closeOverlay('del-overlay');
+  renderHome();
+  toast('問題集を削除しました');
+  pendingDeleteId = null;
+}
+
+/* ================================================================
+   OVERLAY HELPERS
+================================================================ */
+function openOverlay(id) { document.getElementById(id).classList.add('open'); }
+function closeOverlay(id){ document.getElementById(id).classList.remove('open'); }
+function maybeCloseOverlay(e, id) { if (e.target.id === id) closeOverlay(id); }
+
+/* ================================================================
+   TOAST
+================================================================ */
+let toastTid;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTid);
+  toastTid = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+/* ================================================================
+   UTILS
+================================================================ */
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ================================================================
+   SERVICE WORKER
+================================================================ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+
+/* ================================================================
+   INIT
+================================================================ */
+renderHome();
+</script>
+</body>
+</html>
